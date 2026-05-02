@@ -10,7 +10,7 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #030110; }
-    #root { width: 100vw; height: 100vh; }
+    #root { width: 100vw; height: 100vh; height: 100dvh; }
 
     @keyframes confettiFall {
       0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
@@ -318,6 +318,10 @@ function useThreeWheel(canvasRef, rotationRef) {
       const W = canvas.clientWidth, H = canvas.clientHeight;
       renderer.setSize(W, H, false);
       camera.aspect = W / H;
+      const phonePortrait = W <= 640 || W < H * 0.72;
+      camera.position.set(0, phonePortrait ? 1.45 : 2, phonePortrait ? 13.6 : 11);
+      camera.fov = phonePortrait ? 62 : 55;
+      camera.lookAt(0, phonePortrait ? -0.18 : 0, 0);
       camera.updateProjectionMatrix();
     }
     const ro = new ResizeObserver(resize);
@@ -428,6 +432,23 @@ function useCollection() {
 // ============================================================
 // COMPONENTS
 // ============================================================
+
+function useIsPhone() {
+  const getIsPhone = () => window.innerWidth <= 640 || window.innerWidth < window.innerHeight * 0.72;
+  const [isPhone, setIsPhone] = useState(getIsPhone);
+
+  useEffect(() => {
+    const onResize = () => setIsPhone(getIsPhone());
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
+
+  return isPhone;
+}
 
 // — WheelScene —
 function WheelScene({ rotRef }) {
@@ -625,6 +646,7 @@ function RewardReveal({ giftId, onClose }) {
 
 // — Showcase —
 function ShowcaseView({ collection }) {
+  const isPhone = useIsPhone();
   const sorted = useMemo(() => {
     const order = { Epic:0, Rare:1, Normal:2 };
     return [...collection].sort((a,b) => {
@@ -633,7 +655,7 @@ function ShowcaseView({ collection }) {
     });
   }, [collection]);
 
-  const PER_ROW = 5, ROWS = 3;
+  const PER_ROW = isPhone ? 3 : 5, ROWS = isPhone ? 5 : 3;
   const TOTAL = PER_ROW * ROWS;
   const slots = Array.from({ length: TOTAL }, (_, i) => sorted[i] || null);
 
@@ -641,14 +663,14 @@ function ShowcaseView({ collection }) {
     style: {
       width:'100%', height:'100%',
       overflowY:'auto',
-      padding:'80px 24px 120px',
-      display:'flex', flexDirection:'column', alignItems:'center', gap:12,
+      padding: isPhone ? '72px 10px 150px' : '80px 24px 120px',
+      display:'flex', flexDirection:'column', alignItems:'center', gap: isPhone ? 8 : 12,
     }
   },
     h('div', {
       style: {
         fontFamily:"'Lilita One', cursive",
-        fontSize:28, color:'#ffd700',
+        fontSize: isPhone ? 23 : 28, color:'#ffd700',
         textShadow:'0 0 20px #ffd70066',
         marginBottom:8,
         textAlign:'center',
@@ -662,9 +684,9 @@ function ShowcaseView({ collection }) {
           background:'linear-gradient(180deg, #1e1205 0%, #130c03 100%)',
           border:'2px solid #3d1f00',
           borderRadius:16,
-          padding:'20px 16px 28px',
+          padding: isPhone ? '14px 8px 22px' : '20px 16px 28px',
           boxShadow:'0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,200,0,0.08)',
-          width:'100%', maxWidth:600,
+          width:'100%', maxWidth: isPhone ? 330 : 600,
           position:'relative',
         }
       },
@@ -696,6 +718,7 @@ function ShowcaseView({ collection }) {
 }
 
 function ShowcaseItem({ gift, count }) {
+  const isPhone = useIsPhone();
   const [hov, setHov] = useState(false);
   const rc = RARITY_COLORS[gift.rarity];
   const rg = RARITY_GLOW[gift.rarity];
@@ -704,7 +727,7 @@ function ShowcaseItem({ gift, count }) {
     onMouseEnter: () => setHov(true),
     onMouseLeave: () => setHov(false),
     style: {
-      width: 96, textAlign:'center', cursor:'pointer',
+      width: isPhone ? 82 : 96, textAlign:'center', cursor:'pointer',
       transition:'transform 0.2s',
       transform: hov ? 'scale(1.1) translateY(-4px)' : 'scale(1)',
       animation: `floatItem ${2 + Math.random()*1.5}s ease-in-out infinite`,
@@ -713,12 +736,12 @@ function ShowcaseItem({ gift, count }) {
     // Gem/gift box
     h('div', {
       style: {
-        width:72, height:72, margin:'0 auto 6px',
+        width: isPhone ? 58 : 72, height: isPhone ? 58 : 72, margin:'0 auto 6px',
         background:`radial-gradient(circle at 35% 35%, ${gift.color}88, ${RARITY_BG[gift.rarity]})`,
         border:`2px solid ${rc}`,
         borderRadius:12,
         display:'flex', alignItems:'center', justifyContent:'center',
-        fontSize:32,
+        fontSize: isPhone ? 26 : 32,
         boxShadow:`0 4px 16px ${rg}44${hov ? ', 0 0 28px '+rg+'88' : ''}`,
         transition:'box-shadow 0.2s',
         position:'relative',
@@ -741,7 +764,7 @@ function ShowcaseItem({ gift, count }) {
     h('div', {
       style: {
         fontFamily:"'Nunito', sans-serif",
-        fontSize:10, color:rc, lineHeight:1.3,
+        fontSize: isPhone ? 9 : 10, color:rc, lineHeight:1.25,
         fontWeight:700,
       }
     }, gift.name)
@@ -749,16 +772,17 @@ function ShowcaseItem({ gift, count }) {
 }
 
 function EmptySlot() {
+  const isPhone = useIsPhone();
   return h('div', {
     style: {
-      width:96, height:72+28, display:'flex',
+      width: isPhone ? 82 : 96, height:(isPhone ? 58 : 72)+28, display:'flex',
       flexDirection:'column', alignItems:'center', justifyContent:'center',
       gap:6,
     }
   },
     h('div', {
       style: {
-        width:72, height:72,
+        width: isPhone ? 58 : 72, height: isPhone ? 58 : 72,
         border:'2px dashed #2a2040',
         borderRadius:12,
         display:'flex', alignItems:'center', justifyContent:'center',
@@ -771,24 +795,26 @@ function EmptySlot() {
 
 // — Stats Badge —
 function StatBadge({ label, value, color }) {
+  const isPhone = useIsPhone();
   return h('div', {
     style: {
       background:'rgba(255,255,255,0.05)',
       border:`1px solid ${color}44`,
-      borderRadius:12,
-      padding:'8px 12px',
+      borderRadius: isPhone ? 10 : 12,
+      padding: isPhone ? '5px 8px' : '8px 12px',
       textAlign:'center',
       backdropFilter:'blur(6px)',
-      minWidth:54,
+      minWidth: isPhone ? 46 : 54,
     }
   },
-    h('div', { style:{ fontFamily:"'Lilita One', cursive", fontSize:20, color } }, value),
-    h('div', { style:{ fontFamily:"'Nunito', sans-serif", fontSize:10, color:'#888', marginTop:2 } }, label)
+    h('div', { style:{ fontFamily:"'Lilita One', cursive", fontSize: isPhone ? 17 : 20, color } }, value),
+    h('div', { style:{ fontFamily:"'Nunito', sans-serif", fontSize: isPhone ? 9 : 10, color:'#888', marginTop:2 } }, label)
   );
 }
 
 // — Main App —
 function App() {
+  const isPhone = useIsPhone();
   const [view, setView] = useState('wheel');
   const [pendingGift, setPendingGift] = useState(null);
   const { collection, addGift } = useCollection();
@@ -810,7 +836,7 @@ function App() {
 
   return h('div', {
     style: {
-      width:'100vw', height:'100vh',
+      width:'100vw', height:'100dvh',
       background:'radial-gradient(ellipse at 30% 20%, #0d0826 0%, #050210 60%, #000 100%)',
       position:'relative', overflow:'hidden',
     }
@@ -824,9 +850,9 @@ function App() {
       'aria-hidden':'true',
       style:{
         position:'absolute',
-        top:'clamp(56px, 8vh, 72px)',
-        right:'clamp(16px, 3vw, 32px)',
-        width:'clamp(56px, 9vw, 120px)',
+        top: isPhone ? '58px' : 'clamp(56px, 8vh, 72px)',
+        right: isPhone ? '12px' : 'clamp(16px, 3vw, 32px)',
+        width: isPhone ? 52 : 'clamp(56px, 9vw, 120px)',
         height:'auto',
         pointerEvents:'none',
         zIndex:2,
@@ -843,30 +869,32 @@ function App() {
     h('div', {
       style: {
         position:'absolute', top:0, left:0, right:0, zIndex:10,
-        padding:'14px 20px',
+        padding: isPhone ? '10px 10px 18px' : '14px 20px',
         display:'flex', alignItems:'center', justifyContent:'space-between',
+        gap: isPhone ? 8 : 12,
         background:'linear-gradient(180deg, rgba(3,1,16,0.92) 0%, transparent 100%)',
       }
     },
       h('div', {
         style: {
           fontFamily:"'Lilita One', cursive",
-          fontSize:24, color:'#ffd700',
+          fontSize: isPhone ? 19 : 24, color:'#ffd700',
           textShadow:'0 0 20px #ffd70088',
           letterSpacing:1,
+          whiteSpace:'nowrap',
         }
       }, '🎁 Surprise Gift'),
-      h('div', { style:{ display:'flex', gap:6 } },
+      h('div', { style:{ display:'flex', gap: isPhone ? 4 : 6, flexWrap:'wrap', justifyContent:'flex-end' } },
         Object.values(RARITY).map(r =>
           h('div', {
             key:r,
             style: {
               fontFamily:"'Nunito', sans-serif",
-              fontSize:12, fontWeight:700,
+              fontSize: isPhone ? 10 : 12, fontWeight:700,
               background:`${RARITY_GLOW[r]}22`,
               border:`1px solid ${RARITY_GLOW[r]}55`,
               color:RARITY_COLORS[r],
-              borderRadius:20, padding:'4px 10px',
+              borderRadius:20, padding: isPhone ? '3px 7px' : '4px 10px',
               display:'flex', alignItems:'center', gap:3,
             }
           },
@@ -882,13 +910,13 @@ function App() {
     h('div', {
       style: {
         position:'absolute', bottom:0, left:0, right:0, zIndex:10,
-        padding:'16px 20px 24px',
-        display:'flex', flexDirection:'column', alignItems:'center', gap:14,
+        padding: isPhone ? '10px 10px calc(14px + env(safe-area-inset-bottom))' : '16px 20px 24px',
+        display:'flex', flexDirection:'column', alignItems:'center', gap: isPhone ? 9 : 14,
         background:'linear-gradient(0deg, rgba(3,1,16,0.94) 0%, transparent 100%)',
       }
     },
       // Stats
-      h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' } },
+      h('div', { style:{ display:'flex', gap: isPhone ? 5 : 8, flexWrap:'wrap', justifyContent:'center', maxWidth: isPhone ? 330 : 'none' } },
         h(StatBadge, { label:'Total', value:stats.total, color:'#ffd700' }),
         h(StatBadge, { label:'Unique', value:stats.unique, color:'#88aaff' }),
         h(StatBadge, { label:'Normal', value:stats.byR.Normal, color:RARITY_COLORS.Normal }),
@@ -897,7 +925,7 @@ function App() {
       ),
 
       // Buttons
-      h('div', { style:{ display:'flex', gap:12 } },
+      h('div', { style:{ display:'flex', gap: isPhone ? 8 : 12, justifyContent:'center', width:'100%', maxWidth: isPhone ? 340 : 'none' } },
         view === 'wheel' ? h(React.Fragment, null,
           // SPIN button
           h('button', {
@@ -905,8 +933,8 @@ function App() {
             disabled: isSpinning,
             style: {
               fontFamily:"'Lilita One', cursive",
-              fontSize:20, letterSpacing:2,
-              padding:'15px 50px', borderRadius:50, border:'none',
+              fontSize: isPhone ? 18 : 20, letterSpacing: isPhone ? 1 : 2,
+              padding: isPhone ? '13px 32px' : '15px 50px', borderRadius:50, border:'none',
               cursor: isSpinning ? 'not-allowed' : 'pointer',
               background: isSpinning
                 ? 'linear-gradient(135deg, #333 0%, #222 100%)'
@@ -923,8 +951,8 @@ function App() {
             onClick: () => setView('showcase'),
             style: {
               fontFamily:"'Lilita One', cursive",
-              fontSize:15, letterSpacing:1,
-              padding:'13px 26px', borderRadius:50,
+              fontSize: isPhone ? 13 : 15, letterSpacing:1,
+              padding: isPhone ? '12px 16px' : '13px 26px', borderRadius:50,
               border:'2px solid #8866ff',
               cursor:'pointer', background:'#8866ff22',
               color:'#8866ff',
@@ -939,8 +967,8 @@ function App() {
             onClick: () => setView('wheel'),
             style: {
               fontFamily:"'Lilita One', cursive",
-              fontSize:17, letterSpacing:1,
-              padding:'14px 36px', borderRadius:50,
+              fontSize: isPhone ? 15 : 17, letterSpacing:1,
+              padding: isPhone ? '12px 26px' : '14px 36px', borderRadius:50,
               border:'2px solid #ff6644',
               cursor:'pointer', background:'#ff664422',
               color:'#ff6644',
