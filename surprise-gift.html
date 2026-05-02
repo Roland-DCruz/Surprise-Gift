@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🎁 Surprise Gift</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #030110; }
+    #root { width: 100vw; height: 100vh; }
+
+    @keyframes confettiFall {
+      0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+    @keyframes revealCard {
+      0%   { opacity: 0; transform: scale(0.3) translateY(60px); }
+      70%  { transform: scale(1.08) translateY(-8px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes epicGlow {
+      0%, 100% { filter: drop-shadow(0 0 20px #ff00ff) drop-shadow(0 0 40px #ff00ff); }
+      50%       { filter: drop-shadow(0 0 40px #ff00ff) drop-shadow(0 0 80px #ff00ff); }
+    }
+    @keyframes rareGlow {
+      0%, 100% { filter: drop-shadow(0 0 12px #00e676); }
+      50%       { filter: drop-shadow(0 0 28px #00e676); }
+    }
+    @keyframes floatOrb {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50%       { transform: translateY(-20px) scale(1.1); }
+    }
+    @keyframes btnPulse {
+      0%, 100% { box-shadow: 0 4px 30px #ff660088, 0 0 60px #ffd70044; }
+      50%       { box-shadow: 0 4px 50px #ff6600cc, 0 0 100px #ffd70088; }
+    }
+    @keyframes shimmerText {
+      0%   { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+    @keyframes spinPulse {
+      0%, 100% { opacity: 0.6; }
+      50%       { opacity: 1; }
+    }
+    @keyframes popIn {
+      0%   { opacity: 0; transform: scale(0) rotate(-10deg); }
+      80%  { transform: scale(1.15) rotate(3deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+    @keyframes floatItem {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-6px); }
+    }
+    @keyframes planetSpin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============================================================
+// GIFT SYSTEM DATA
+// ============================================================
+const RARITY = { NORMAL: 'Normal', RARE: 'Rare', EPIC: 'Epic' };
+
+const RARITY_COLORS = {
+  Normal: '#a0c4ff', Rare: '#b9fbc0', Epic: '#ffadff'
+};
+const RARITY_GLOW = {
+  Normal: '#4096ff', Rare: '#00e676', Epic: '#ff00ff'
+};
+const RARITY_BG = {
+  Normal: '#0d1533', Rare: '#0d2a1a', Epic: '#1e0d1e'
+};
+
+const GIFTS = [
+  { id:'teddy',     name:'Teddy Bear',      rarity:'Normal', color:'#c8a97e', shape:'sphere',   emoji:'🧸' },
+  { id:'balloon',   name:'Red Balloon',     rarity:'Normal', color:'#ff4444', shape:'sphere',   emoji:'🎈' },
+  { id:'candy',     name:'Candy Box',       rarity:'Normal', color:'#ff88cc', shape:'box',      emoji:'🍬' },
+  { id:'yo_yo',     name:'Yo-Yo',           rarity:'Normal', color:'#44aaff', shape:'torus',    emoji:'🪀' },
+  { id:'kite',      name:'Flying Kite',     rarity:'Normal', color:'#ffcc44', shape:'cone',     emoji:'🪁' },
+  { id:'puzzle',    name:'Magic Puzzle',    rarity:'Rare',   color:'#44ff88', shape:'box',      emoji:'🧩' },
+  { id:'robot',     name:'Toy Robot',       rarity:'Rare',   color:'#88aaff', shape:'box',      emoji:'🤖' },
+  { id:'telescope', name:'Mini Telescope',  rarity:'Rare',   color:'#ffaa44', shape:'cylinder', emoji:'🔭' },
+  { id:'crystal',   name:'Crystal Orb',     rarity:'Epic',   color:'#ff44ff', shape:'sphere',   emoji:'🔮' },
+  { id:'dragon',    name:'Dragon Figurine', rarity:'Epic',   color:'#ff2244', shape:'cone',     emoji:'🐉' },
+  { id:'crown',     name:'Golden Crown',    rarity:'Epic',   color:'#ffd700', shape:'torus',    emoji:'👑' },
+  { id:'rocket',    name:'Rocket Ship',     rarity:'Rare',   color:'#cc44ff', shape:'cone',     emoji:'🚀' },
+];
+
+const WHEEL_SEGMENTS = [
+  'teddy','puzzle','teddy','crystal','balloon','robot',
+  'candy','dragon','yo_yo','telescope','kite','crown',
+  'teddy','rocket','candy','puzzle','balloon','crystal'
+];
+const SEG_COUNT = WHEEL_SEGMENTS.length;
+const SEG_ANGLE = (Math.PI * 2) / SEG_COUNT;
+
+function getGiftById(id) { return GIFTS.find(g => g.id === id); }
+
+// Storage
+const STORAGE_KEY = 'surprise_gift_v2';
+function loadCollection() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+}
+function saveCollection(col) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(col)); } catch {}
+}
+function addGiftToCollection(col, id) {
+  const ex = col.find(c => c.id === id);
+  if (ex) return col.map(c => c.id === id ? {...c, count: c.count+1} : c);
+  return [...col, { id, count: 1, at: Date.now() }];
+}
+function getStats(col) {
+  const total = col.reduce((s,c) => s+c.count, 0);
+  const unique = col.length;
+  const byR = { Normal:0, Rare:0, Epic:0 };
+  col.forEach(c => { const g = getGiftById(c.id); if (g) byR[g.rarity] += c.count; });
+  return { total, unique, byR };
+}
+
+// ============================================================
+// SOUND SYSTEM
+// ============================================================
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
+  return audioCtx;
+}
+function tone({ freq=440, type='sine', dur=0.15, gain=0.3, start=0 }) {
+  try {
+    const ctx = getAudioCtx(); if (!ctx) return;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = type;
+    o.frequency.setValueAtTime(freq, ctx.currentTime + start);
+    g.gain.setValueAtTime(gain, ctx.currentTime + start);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+    o.start(ctx.currentTime + start);
+    o.stop(ctx.currentTime + start + dur);
+  } catch {}
+}
+function playSpinStart() {
+  try {
+    const ctx = getAudioCtx(); if (!ctx) return;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(200, ctx.currentTime);
+    o.frequency.linearRampToValueAtTime(600, ctx.currentTime + 0.4);
+    g.gain.setValueAtTime(0.2, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+function playTick() { tone({ freq:900, type:'square', dur:0.035, gain:0.12 }); }
+function playWin(rarity) {
+  const sets = {
+    Normal: [[523,0],[659,0.12],[784,0.24]],
+    Rare:   [[523,0],[659,0.1],[784,0.2],[1047,0.3]],
+    Epic:   [[523,0],[659,0.08],[784,0.16],[1047,0.24],[1319,0.32]],
+  };
+  (sets[rarity]||sets.Normal).forEach(([f,t]) => tone({ freq:f, type:'sine', dur:rarity==='Epic'?0.5:0.3, gain:0.35, start:t }));
+}
+
+// ============================================================
+// THREE.JS WHEEL RENDERER (canvas-based)
+// ============================================================
+const { useEffect, useRef, useState, useCallback, useMemo } = React;
+const h = React.createElement;
+
+function useThreeWheel(canvasRef, rotationRef) {
+  const sceneRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
+    camera.position.set(0, 2, 11);
+    camera.lookAt(0, 0, 0);
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0x443366, 0.8));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+    dir.position.set(5, 8, 5); scene.add(dir);
+    const pl1 = new THREE.PointLight(0x6644ff, 2, 20); pl1.position.set(-5, 5, 5); scene.add(pl1);
+    const pl2 = new THREE.PointLight(0xff4488, 1.5, 15); pl2.position.set(5, -3, 5); scene.add(pl2);
+
+    // Stars
+    const starGeo = new THREE.BufferGeometry();
+    const starArr = new Float32Array(600);
+    for (let i = 0; i < 600; i++) starArr[i] = (Math.random()-0.5) * (i%3===2 ? -25-Math.random()*15 : 35);
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starArr, 3));
+    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 0.07, color: 0xffffff, transparent: true, opacity: 0.8 })));
+
+    // Wheel group
+    const wheelGroup = new THREE.Group();
+    scene.add(wheelGroup);
+
+    const TWO_PI = Math.PI * 2;
+    const R = 3.2, THICK = 0.45;
+
+    // Build segments
+    const segColors = { Normal: [0x1a1a3e, 0x1e1e48], Rare: [0x0d2a1a, 0x0f3020], Epic: [0x2a0a2a, 0x300d30] };
+    const accentHex = { Normal: 0xa0c4ff, Rare: 0xb9fbc0, Epic: 0xffadff };
+
+    WHEEL_SEGMENTS.forEach((giftId, i) => {
+      const gift = getGiftById(giftId);
+      const angle = (i / SEG_COUNT) * TWO_PI;
+      const mid = angle + SEG_ANGLE / 2;
+      const cols = segColors[gift.rarity];
+      const col = i % 2 === 0 ? cols[0] : cols[1];
+
+      // Segment shape
+      const shape = new THREE.Shape();
+      const innerR = 0.52, outerR = R;
+      const halfA = SEG_ANGLE / 2 - 0.025;
+      shape.moveTo(Math.cos(-halfA)*innerR, Math.sin(-halfA)*innerR);
+      shape.lineTo(Math.cos(-halfA)*outerR, Math.sin(-halfA)*outerR);
+      for (let j = 0; j <= 10; j++) {
+        const a = -halfA + (j/10)*(SEG_ANGLE-0.05);
+        shape.lineTo(Math.cos(a)*outerR, Math.sin(a)*outerR);
+      }
+      shape.lineTo(Math.cos(halfA)*innerR, Math.sin(halfA)*innerR);
+      for (let j = 10; j >= 0; j--) {
+        const a = -halfA + (j/10)*(SEG_ANGLE-0.05);
+        shape.lineTo(Math.cos(a)*innerR, Math.sin(a)*innerR);
+      }
+
+      const extGeo = new THREE.ExtrudeGeometry(shape, { depth: THICK, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 1 });
+      const seg = new THREE.Mesh(extGeo, new THREE.MeshStandardMaterial({ color: col, metalness: 0.3, roughness: 0.5, emissive: col, emissiveIntensity: 0.08 }));
+      seg.rotation.z = angle;
+      wheelGroup.add(seg);
+
+      // Accent strip near outer edge
+      const stripGeo = new THREE.BoxGeometry(0.07, 0.07, THICK + 0.08);
+      const strip = new THREE.Mesh(stripGeo, new THREE.MeshStandardMaterial({ color: accentHex[gift.rarity], emissive: accentHex[gift.rarity], emissiveIntensity: 1 }));
+      strip.position.set(Math.cos(mid)*(R-0.18), Math.sin(mid)*(R-0.18), THICK/2);
+      wheelGroup.add(strip);
+    });
+
+    // Outer ring
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(R, 0.1, 12, 80),
+      new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.95, roughness: 0.05, emissive: 0x886600, emissiveIntensity: 0.3 })
+    );
+    ring.position.z = THICK / 2;
+    wheelGroup.add(ring);
+
+    // Hub
+    const hub = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.52, 0.52, THICK + 0.12, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.9, roughness: 0.1, emissive: 0xcc9900, emissiveIntensity: 0.3 })
+    );
+    hub.rotation.x = Math.PI / 2;
+    hub.position.z = THICK / 2;
+    wheelGroup.add(hub);
+
+    const hubStar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.24, 0.24, 0.1, 6),
+      new THREE.MeshStandardMaterial({ color: 0xffee44, metalness: 1, roughness: 0, emissive: 0xffcc00, emissiveIntensity: 0.6 })
+    );
+    hubStar.rotation.x = Math.PI / 2;
+    hubStar.position.z = THICK + 0.08;
+    wheelGroup.add(hubStar);
+
+    // Pointer (fixed, not part of wheel group)
+    const ptrGroup = new THREE.Group();
+    ptrGroup.position.set(0, R + 0.55, THICK + 0.25);
+    const arrow = new THREE.Mesh(
+      new THREE.ConeGeometry(0.27, 0.75, 3),
+      new THREE.MeshStandardMaterial({ color: 0xff2222, emissive: 0xff0000, emissiveIntensity: 0.5, metalness: 0.6 })
+    );
+    arrow.rotation.z = Math.PI;
+    ptrGroup.add(arrow);
+    const stem = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.45, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0xcc1111 })
+    );
+    stem.position.y = 0.55;
+    ptrGroup.add(stem);
+    const ptrLight = new THREE.PointLight(0xff4444, 3, 2.5);
+    ptrGroup.add(ptrLight);
+    scene.add(ptrGroup);
+
+    // Pedestal
+    const ped1 = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.6, 2.1, 0.5, 32),
+      new THREE.MeshStandardMaterial({ color: 0x1a1235, metalness: 0.4, roughness: 0.6 })
+    );
+    ped1.position.set(0, -4.2, 0);
+    scene.add(ped1);
+    const ped2 = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.1, 2.6, 0.5, 32),
+      new THREE.MeshStandardMaterial({ color: 0x120d28, metalness: 0.5, roughness: 0.5 })
+    );
+    ped2.position.set(0, -4.7, 0);
+    scene.add(ped2);
+
+    sceneRef.current = { scene, camera, renderer, wheelGroup };
+
+    // Resize
+    function resize() {
+      const W = canvas.clientWidth, H = canvas.clientHeight;
+      renderer.setSize(W, H, false);
+      camera.aspect = W / H;
+      camera.updateProjectionMatrix();
+    }
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+    resize();
+
+    // Render loop
+    let rafId;
+    let t = 0;
+    function animate() {
+      rafId = requestAnimationFrame(animate);
+      t += 0.01;
+      // Animate lights
+      pl1.intensity = 1.8 + Math.sin(t * 1.2) * 0.3;
+      pl2.intensity = 1.2 + Math.sin(t * 0.8) * 0.2;
+      // Apply rotation from ref
+      if (rotationRef.current !== undefined) {
+        wheelGroup.rotation.z = rotationRef.current;
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      ro.disconnect();
+      renderer.dispose();
+    };
+  }, []);
+
+  return sceneRef;
+}
+
+// ============================================================
+// SPIN MECHANICS HOOK
+// ============================================================
+function useSpinMechanics() {
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const rotRef = useRef(0);
+  const lastTickSeg = useRef(-1);
+  const rafRef = useRef(null);
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  const spin = useCallback((onComplete) => {
+    if (isSpinning) return;
+    const winSeg = Math.floor(Math.random() * SEG_COUNT);
+    const TWO_PI = Math.PI * 2;
+    const minSpins = 5 + Math.random() * 3;
+    const cur = rotRef.current;
+    const curAngle = ((cur % TWO_PI) + TWO_PI) % TWO_PI;
+    const targetAngle = (winSeg + 0.5) * SEG_ANGLE;
+    let delta = targetAngle - curAngle;
+    if (delta < 0) delta += TWO_PI;
+    const totalRot = minSpins * TWO_PI + delta;
+    const duration = 4000 + Math.random() * 1500;
+    const startRot = cur;
+    const startTime = performance.now();
+
+    setIsSpinning(true);
+    playSpinStart();
+
+    function animate(now) {
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      const easedT = easeOut(t);
+      const newRot = startRot + totalRot * easedT;
+      rotRef.current = newRot;
+      setRotation(newRot);
+
+      const curSeg = Math.floor(((newRot % TWO_PI) + TWO_PI) % TWO_PI / SEG_ANGLE);
+      if (curSeg !== lastTickSeg.current) {
+        lastTickSeg.current = curSeg;
+        if (t < 0.87) playTick();
+      }
+
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      } else {
+        rotRef.current = startRot + totalRot;
+        setRotation(startRot + totalRot);
+        setIsSpinning(false);
+        setTimeout(() => onComplete && onComplete(WHEEL_SEGMENTS[winSeg]), 300);
+      }
+    }
+    rafRef.current = requestAnimationFrame(animate);
+  }, [isSpinning]);
+
+  return { isSpinning, rotation, rotRef, spin };
+}
+
+// ============================================================
+// COLLECTION HOOK
+// ============================================================
+function useCollection() {
+  const [collection, setCollection] = useState(() => loadCollection());
+  const addGift = useCallback((id) => {
+    setCollection(prev => {
+      const next = addGiftToCollection(prev, id);
+      saveCollection(next);
+      return next;
+    });
+  }, []);
+  return { collection, addGift };
+}
+
+// ============================================================
+// COMPONENTS
+// ============================================================
+
+// — WheelScene —
+function WheelScene({ rotRef }) {
+  const canvasRef = useRef(null);
+  useThreeWheel(canvasRef, rotRef);
+  return h('canvas', {
+    ref: canvasRef,
+    style: { width: '100%', height: '100%', display: 'block' }
+  });
+}
+
+// — 3D Gift Preview on Showcase —
+function useGiftPreviewScene(canvasRef, gift) {
+  useEffect(() => {
+    if (!canvasRef.current || !gift) return;
+    const canvas = canvasRef.current;
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 50);
+    camera.position.set(0, 0, 3);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const pl = new THREE.PointLight(
+      parseInt(RARITY_GLOW[gift.rarity].replace('#',''), 16),
+      3, 10
+    );
+    pl.position.set(2, 2, 2);
+    scene.add(pl);
+
+    const col = parseInt(gift.color.replace('#',''), 16);
+    let geo;
+    if (gift.shape === 'sphere') geo = new THREE.SphereGeometry(0.65, 32, 32);
+    else if (gift.shape === 'box') geo = new THREE.BoxGeometry(1.1, 1.1, 1.1);
+    else if (gift.shape === 'torus') geo = new THREE.TorusGeometry(0.5, 0.2, 16, 40);
+    else if (gift.shape === 'cone') geo = new THREE.ConeGeometry(0.55, 1.1, 6);
+    else geo = new THREE.CylinderGeometry(0.35, 0.35, 1.1, 16);
+
+    const isEpic = gift.rarity === 'Epic', isRare = gift.rarity === 'Rare';
+    const glowCol = parseInt(RARITY_GLOW[gift.rarity].replace('#',''), 16);
+    const mat = new THREE.MeshStandardMaterial({
+      color: col, metalness: isEpic ? 0.8 : isRare ? 0.5 : 0.2,
+      roughness: isEpic ? 0.1 : 0.4,
+      emissive: glowCol, emissiveIntensity: isEpic ? 0.5 : isRare ? 0.3 : 0.15
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    scene.add(mesh);
+
+    let rafId;
+    function animate() {
+      rafId = requestAnimationFrame(animate);
+      mesh.rotation.y += 0.025;
+      const t = performance.now() / 1000;
+      mesh.scale.setScalar(1 + Math.sin(t * 3) * 0.04);
+      renderer.render(scene, camera);
+    }
+    animate();
+    return () => { cancelAnimationFrame(rafId); renderer.dispose(); };
+  }, [gift]);
+}
+
+function GiftPreview3D({ gift }) {
+  const ref = useRef(null);
+  useGiftPreviewScene(ref, gift);
+  return h('canvas', { ref, style: { width: 160, height: 160, display: 'block' } });
+}
+
+// — Confetti —
+function Confetti({ rarity }) {
+  const CONFETTI_COLORS = ['#ff3366','#ffd700','#00ff88','#4488ff','#ff88ff','#ffaa00'];
+  const count = rarity === 'Epic' ? 70 : rarity === 'Rare' ? 45 : 25;
+  const pieces = useMemo(() => Array.from({ length: count }, (_, i) => ({
+    x: Math.random() * 100,
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    delay: Math.random() * 0.6,
+    size: 6 + Math.random() * 8,
+    isCircle: Math.random() > 0.5,
+  })), [rarity]);
+
+  return h('div', { style: { position:'absolute', inset:0, pointerEvents:'none', overflow:'hidden', zIndex:0 } },
+    pieces.map((p, i) => h('div', {
+      key: i,
+      style: {
+        position: 'absolute',
+        left: `${p.x}%`, top: '-20px',
+        width: p.size, height: p.size,
+        background: p.color,
+        borderRadius: p.isCircle ? '50%' : '2px',
+        animation: `confettiFall ${1.2 + Math.random()}s linear ${p.delay}s forwards`,
+      }
+    }))
+  );
+}
+
+// — Reward Reveal Modal —
+function RewardReveal({ giftId, onClose }) {
+  const gift = getGiftById(giftId);
+  const [vis, setVis] = useState(false);
+  useEffect(() => {
+    if (!gift) return;
+    const t = setTimeout(() => setVis(true), 50);
+    playWin(gift.rarity);
+    return () => clearTimeout(t);
+  }, [gift]);
+
+  if (!gift) return null;
+  const rc = RARITY_COLORS[gift.rarity];
+  const rg = RARITY_GLOW[gift.rarity];
+  const isEpic = gift.rarity === 'Epic', isRare = gift.rarity === 'Rare';
+
+  return h('div', {
+    style: {
+      position:'fixed', inset:0, zIndex:200,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      background:'rgba(0,0,0,0.88)', backdropFilter:'blur(10px)',
+      overflow:'hidden',
+    }
+  },
+    h(Confetti, { rarity: gift.rarity }),
+    h('div', {
+      style: {
+        position:'relative', zIndex:1,
+        animation: `revealCard 0.65s cubic-bezier(0.34,1.56,0.64,1) forwards${isEpic ? ', epicGlow 2s ease-in-out 0.7s infinite' : isRare ? ', rareGlow 2s ease-in-out 0.7s infinite' : ''}`,
+        background: `linear-gradient(135deg, ${RARITY_BG[gift.rarity]} 0%, #0a0820 100%)`,
+        border: `2px solid ${rc}`,
+        borderRadius: 28,
+        padding: '44px 52px',
+        textAlign: 'center',
+        maxWidth: 400, width: '90%',
+        boxShadow: `0 0 60px ${rg}33, inset 0 1px 0 rgba(255,255,255,0.07)`,
+      }
+    },
+      // Rarity badge
+      h('div', {
+        style: {
+          position:'absolute', top:-18, left:'50%', transform:'translateX(-50%)',
+          background: rg, color:'#000',
+          fontFamily:"'Lilita One', cursive",
+          fontSize: 13, padding:'5px 22px',
+          borderRadius: 20, letterSpacing:2, textTransform:'uppercase',
+          boxShadow: `0 0 24px ${rg}`,
+        }
+      }, isEpic ? '✨ EPIC ✨' : isRare ? '⭐ RARE ⭐' : '🎀 NORMAL'),
+
+      // 3D Preview
+      h('div', { style:{ display:'flex', justifyContent:'center', marginBottom:4 } },
+        h(GiftPreview3D, { gift })
+      ),
+
+      h('div', { style:{ fontSize:50, marginBottom:6, lineHeight:1 } }, gift.emoji),
+
+      h('h2', {
+        style: {
+          fontFamily:"'Lilita One', cursive",
+          fontSize: 30, color:'#fff',
+          margin:'0 0 10px',
+          textShadow: `0 0 24px ${rg}`,
+          ...(isEpic ? {
+            background:`linear-gradient(90deg, ${rg}, #fff, ${rg})`,
+            backgroundSize:'200% auto',
+            WebkitBackgroundClip:'text',
+            WebkitTextFillColor:'transparent',
+            animation:'shimmerText 2s linear infinite',
+          } : {}),
+        }
+      }, gift.name),
+
+      h('p', {
+        style: {
+          fontFamily:"'Nunito', sans-serif",
+          color: rc, fontSize:14, marginBottom:32, opacity:0.9,
+        }
+      }, isEpic ? '🔥 Legendary! A true treasure!' : isRare ? '✨ What a rare find!' : '🎁 A lovely gift for your collection!'),
+
+      h('button', {
+        onClick: onClose,
+        style: {
+          fontFamily:"'Lilita One', cursive",
+          fontSize:19, letterSpacing:1,
+          background:`linear-gradient(135deg, ${rg}, ${rc})`,
+          color:'#000', border:'none',
+          padding:'13px 44px', borderRadius:50,
+          cursor:'pointer',
+          boxShadow:`0 4px 24px ${rg}88`,
+          transition:'transform 0.15s',
+        },
+        onMouseEnter: e => { e.currentTarget.style.transform='scale(1.06)'; },
+        onMouseLeave: e => { e.currentTarget.style.transform='scale(1)'; },
+      }, 'SWEET! 🎉')
+    )
+  );
+}
+
+// — Showcase —
+function ShowcaseView({ collection }) {
+  const sorted = useMemo(() => {
+    const order = { Epic:0, Rare:1, Normal:2 };
+    return [...collection].sort((a,b) => {
+      const ga = getGiftById(a.id), gb = getGiftById(b.id);
+      return (order[ga?.rarity]??3) - (order[gb?.rarity]??3);
+    });
+  }, [collection]);
+
+  const PER_ROW = 5, ROWS = 3;
+  const TOTAL = PER_ROW * ROWS;
+  const slots = Array.from({ length: TOTAL }, (_, i) => sorted[i] || null);
+
+  return h('div', {
+    style: {
+      width:'100%', height:'100%',
+      overflowY:'auto',
+      padding:'80px 24px 120px',
+      display:'flex', flexDirection:'column', alignItems:'center', gap:12,
+    }
+  },
+    h('div', {
+      style: {
+        fontFamily:"'Lilita One', cursive",
+        fontSize:28, color:'#ffd700',
+        textShadow:'0 0 20px #ffd70066',
+        marginBottom:8,
+        textAlign:'center',
+      }
+    }, '🗄️ My Collection'),
+
+    Array.from({ length: ROWS }, (_, rowIdx) =>
+      h('div', {
+        key: rowIdx,
+        style: {
+          background:'linear-gradient(180deg, #1e1205 0%, #130c03 100%)',
+          border:'2px solid #3d1f00',
+          borderRadius:16,
+          padding:'20px 16px 28px',
+          boxShadow:'0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,200,0,0.08)',
+          width:'100%', maxWidth:600,
+          position:'relative',
+        }
+      },
+        // Shelf surface
+        h('div', {
+          style: {
+            position:'absolute', bottom:0, left:0, right:0, height:14,
+            background:'linear-gradient(90deg, #6b3a1a, #8b4513, #6b3a1a)',
+            borderRadius:'0 0 14px 14px',
+            boxShadow:'0 4px 12px rgba(0,0,0,0.5)',
+          }
+        }),
+        h('div', {
+          style: {
+            display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap',
+          }
+        },
+          Array.from({ length: PER_ROW }, (_, colIdx) => {
+            const slot = slots[rowIdx * PER_ROW + colIdx];
+            if (!slot) return h(EmptySlot, { key: colIdx });
+            const gift = getGiftById(slot.id);
+            if (!gift) return null;
+            return h(ShowcaseItem, { key: slot.id + colIdx, gift, count: slot.count });
+          })
+        )
+      )
+    )
+  );
+}
+
+function ShowcaseItem({ gift, count }) {
+  const [hov, setHov] = useState(false);
+  const rc = RARITY_COLORS[gift.rarity];
+  const rg = RARITY_GLOW[gift.rarity];
+
+  return h('div', {
+    onMouseEnter: () => setHov(true),
+    onMouseLeave: () => setHov(false),
+    style: {
+      width: 96, textAlign:'center', cursor:'pointer',
+      transition:'transform 0.2s',
+      transform: hov ? 'scale(1.1) translateY(-4px)' : 'scale(1)',
+      animation: `floatItem ${2 + Math.random()*1.5}s ease-in-out infinite`,
+    }
+  },
+    // Gem/gift box
+    h('div', {
+      style: {
+        width:72, height:72, margin:'0 auto 6px',
+        background:`radial-gradient(circle at 35% 35%, ${gift.color}88, ${RARITY_BG[gift.rarity]})`,
+        border:`2px solid ${rc}`,
+        borderRadius:12,
+        display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:32,
+        boxShadow:`0 4px 16px ${rg}44${hov ? ', 0 0 28px '+rg+'88' : ''}`,
+        transition:'box-shadow 0.2s',
+        position:'relative',
+      }
+    },
+      gift.emoji,
+      count > 1 && h('div', {
+        style: {
+          position:'absolute', top:-8, right:-8,
+          width:22, height:22,
+          background:'#ff3366', borderRadius:'50%',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          fontFamily:"'Nunito', sans-serif",
+          fontWeight:800, fontSize:10, color:'#fff',
+          border:'1.5px solid rgba(0,0,0,0.3)',
+          boxShadow:'0 2px 6px #ff336699',
+        }
+      }, `×${Math.min(count, 99)}`)
+    ),
+    h('div', {
+      style: {
+        fontFamily:"'Nunito', sans-serif",
+        fontSize:10, color:rc, lineHeight:1.3,
+        fontWeight:700,
+      }
+    }, gift.name)
+  );
+}
+
+function EmptySlot() {
+  return h('div', {
+    style: {
+      width:96, height:72+28, display:'flex',
+      flexDirection:'column', alignItems:'center', justifyContent:'center',
+      gap:6,
+    }
+  },
+    h('div', {
+      style: {
+        width:72, height:72,
+        border:'2px dashed #2a2040',
+        borderRadius:12,
+        display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:22, opacity:0.3,
+      }
+    }, '?'),
+    h('div', { style:{ fontFamily:"'Nunito', sans-serif", fontSize:10, color:'#333', opacity:0.4 } }, '???')
+  );
+}
+
+// — Stats Badge —
+function StatBadge({ label, value, color }) {
+  return h('div', {
+    style: {
+      background:'rgba(255,255,255,0.05)',
+      border:`1px solid ${color}44`,
+      borderRadius:12,
+      padding:'8px 12px',
+      textAlign:'center',
+      backdropFilter:'blur(6px)',
+      minWidth:54,
+    }
+  },
+    h('div', { style:{ fontFamily:"'Lilita One', cursive", fontSize:20, color } }, value),
+    h('div', { style:{ fontFamily:"'Nunito', sans-serif", fontSize:10, color:'#888', marginTop:2 } }, label)
+  );
+}
+
+// — Main App —
+function App() {
+  const [view, setView] = useState('wheel');
+  const [pendingGift, setPendingGift] = useState(null);
+  const { collection, addGift } = useCollection();
+  const { isSpinning, rotation, rotRef, spin } = useSpinMechanics();
+
+  // Sync rotation ref for Three.js
+  useEffect(() => {
+    rotRef.current = rotation;
+  }, [rotation]);
+
+  const handleSpin = useCallback(() => {
+    spin((giftId) => {
+      addGift(giftId);
+      setPendingGift(giftId);
+    });
+  }, [spin, addGift]);
+
+  const stats = getStats(collection);
+
+  return h('div', {
+    style: {
+      width:'100vw', height:'100vh',
+      background:'radial-gradient(ellipse at 30% 20%, #0d0826 0%, #050210 60%, #000 100%)',
+      position:'relative', overflow:'hidden',
+    }
+  },
+    // Ambient orbs
+    h('div', { style:{ position:'absolute', top:'8%', left:'12%', width:350, height:350, borderRadius:'50%', background:'radial-gradient(circle, #3322aa18 0%, transparent 70%)', pointerEvents:'none', animation:'floatOrb 8s ease-in-out infinite' } }),
+    h('div', { style:{ position:'absolute', bottom:'18%', right:'8%', width:220, height:220, borderRadius:'50%', background:'radial-gradient(circle, #aa224418 0%, transparent 70%)', pointerEvents:'none', animation:'floatOrb 6s ease-in-out infinite reverse' } }),
+    h('img', {
+      src:'assets/planet.png',
+      alt:'',
+      'aria-hidden':'true',
+      style:{
+        position:'absolute',
+        top:'clamp(56px, 8vh, 72px)',
+        right:'clamp(16px, 3vw, 32px)',
+        width:'clamp(56px, 9vw, 120px)',
+        height:'auto',
+        pointerEvents:'none',
+        zIndex:2,
+        animation:isSpinning ? 'planetSpin 5s linear infinite' : 'none',
+      }
+    }),
+
+    // Scene
+    h('div', { style:{ position:'absolute', inset:0, zIndex:1 } },
+      view === 'wheel' ? h(WheelScene, { rotRef }) : h(ShowcaseView, { collection })
+    ),
+
+    // Top bar
+    h('div', {
+      style: {
+        position:'absolute', top:0, left:0, right:0, zIndex:10,
+        padding:'14px 20px',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        background:'linear-gradient(180deg, rgba(3,1,16,0.92) 0%, transparent 100%)',
+      }
+    },
+      h('div', {
+        style: {
+          fontFamily:"'Lilita One', cursive",
+          fontSize:24, color:'#ffd700',
+          textShadow:'0 0 20px #ffd70088',
+          letterSpacing:1,
+        }
+      }, '🎁 Surprise Gift'),
+      h('div', { style:{ display:'flex', gap:6 } },
+        Object.values(RARITY).map(r =>
+          h('div', {
+            key:r,
+            style: {
+              fontFamily:"'Nunito', sans-serif",
+              fontSize:12, fontWeight:700,
+              background:`${RARITY_GLOW[r]}22`,
+              border:`1px solid ${RARITY_GLOW[r]}55`,
+              color:RARITY_COLORS[r],
+              borderRadius:20, padding:'4px 10px',
+              display:'flex', alignItems:'center', gap:3,
+            }
+          },
+            r === 'Normal' ? '🎀' : r === 'Rare' ? '⭐' : '💎',
+            ' ',
+            h('strong', null, stats.byR[r])
+          )
+        )
+      )
+    ),
+
+    // Bottom controls
+    h('div', {
+      style: {
+        position:'absolute', bottom:0, left:0, right:0, zIndex:10,
+        padding:'16px 20px 24px',
+        display:'flex', flexDirection:'column', alignItems:'center', gap:14,
+        background:'linear-gradient(0deg, rgba(3,1,16,0.94) 0%, transparent 100%)',
+      }
+    },
+      // Stats
+      h('div', { style:{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' } },
+        h(StatBadge, { label:'Total', value:stats.total, color:'#ffd700' }),
+        h(StatBadge, { label:'Unique', value:stats.unique, color:'#88aaff' }),
+        h(StatBadge, { label:'Normal', value:stats.byR.Normal, color:RARITY_COLORS.Normal }),
+        h(StatBadge, { label:'Rare', value:stats.byR.Rare, color:RARITY_COLORS.Rare }),
+        h(StatBadge, { label:'Epic', value:stats.byR.Epic, color:RARITY_COLORS.Epic }),
+      ),
+
+      // Buttons
+      h('div', { style:{ display:'flex', gap:12 } },
+        view === 'wheel' ? h(React.Fragment, null,
+          // SPIN button
+          h('button', {
+            onClick: handleSpin,
+            disabled: isSpinning,
+            style: {
+              fontFamily:"'Lilita One', cursive",
+              fontSize:20, letterSpacing:2,
+              padding:'15px 50px', borderRadius:50, border:'none',
+              cursor: isSpinning ? 'not-allowed' : 'pointer',
+              background: isSpinning
+                ? 'linear-gradient(135deg, #333 0%, #222 100%)'
+                : 'linear-gradient(135deg, #ff6600 0%, #ffd700 50%, #ff6600 100%)',
+              backgroundSize:'200% auto',
+              color: isSpinning ? '#666' : '#1a0500',
+              boxShadow: isSpinning ? 'none' : '0 4px 30px #ff660088, 0 0 60px #ffd70044',
+              transition:'all 0.3s',
+              animation: isSpinning ? 'none' : 'btnPulse 2s ease-in-out infinite',
+            }
+          }, isSpinning ? '🎡 Spinning...' : '🎰 SPIN!'),
+          // Showcase button
+          h('button', {
+            onClick: () => setView('showcase'),
+            style: {
+              fontFamily:"'Lilita One', cursive",
+              fontSize:15, letterSpacing:1,
+              padding:'13px 26px', borderRadius:50,
+              border:'2px solid #8866ff',
+              cursor:'pointer', background:'#8866ff22',
+              color:'#8866ff',
+              backdropFilter:'blur(6px)',
+              boxShadow:'0 0 20px #8866ff44',
+              transition:'all 0.2s',
+            },
+            onMouseEnter: e => { e.currentTarget.style.background='#8866ff44'; e.currentTarget.style.transform='scale(1.05)'; },
+            onMouseLeave: e => { e.currentTarget.style.background='#8866ff22'; e.currentTarget.style.transform='scale(1)'; },
+          }, '🗄️ SHOWCASE')
+        ) : h('button', {
+            onClick: () => setView('wheel'),
+            style: {
+              fontFamily:"'Lilita One', cursive",
+              fontSize:17, letterSpacing:1,
+              padding:'14px 36px', borderRadius:50,
+              border:'2px solid #ff6644',
+              cursor:'pointer', background:'#ff664422',
+              color:'#ff6644',
+              backdropFilter:'blur(6px)',
+              boxShadow:'0 0 20px #ff664444',
+              transition:'all 0.2s',
+            },
+            onMouseEnter: e => { e.currentTarget.style.background='#ff664444'; e.currentTarget.style.transform='scale(1.05)'; },
+            onMouseLeave: e => { e.currentTarget.style.background='#ff664422'; e.currentTarget.style.transform='scale(1)'; },
+        }, '🎡 SPIN WHEEL')
+      )
+    ),
+
+    // Reward reveal
+    pendingGift && h(RewardReveal, {
+      giftId: pendingGift,
+      onClose: () => setPendingGift(null)
+    })
+  );
+}
+
+// ============================================================
+// MOUNT
+// ============================================================
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>
