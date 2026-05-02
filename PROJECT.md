@@ -10,7 +10,7 @@ Surprise Gift Game is an arcade-style reward spinner built with React and Three.
 - Big `SPIN!` action button for starting the wheel.
 - Reward reveal modal after a successful spin.
 - Collection tracking through browser storage.
-- Standalone HTML version available in `surprise-gift.html`.
+- Standalone HTML version available in `index.html`.
 
 ## Main Files
 
@@ -26,7 +26,7 @@ Surprise Gift Game is an arcade-style reward spinner built with React and Three.
 |-- SoundSystem.js          Spin and reward sounds
 |-- useSpinMechanics.js     Wheel spin state and easing
 |-- useCollection.js        Collection state handling
-|-- surprise-gift.html      Standalone browser version
+|-- index.html              Standalone browser version
 |-- assets/
 |   `-- planet.png          Decorative planet image
 |-- package.json            Project scripts and dependencies
@@ -37,7 +37,7 @@ Surprise Gift Game is an arcade-style reward spinner built with React and Three.
 
 ### Standalone Preview
 
-Open `surprise-gift.html` directly in a browser.
+Open `index.html` directly in a browser.
 
 This is useful when you want to preview the single-file version without installing dependencies.
 
@@ -72,7 +72,7 @@ npm run build
 
 ## Notes For Future Changes
 
-- Keep `App.jsx` and `surprise-gift.html` in sync when changing visible app behavior, because both can render the game.
+- Keep `App.jsx` and `index.html` in sync when changing visible app behavior, because both can render the game.
 - `assets/planet.png` is referenced by both versions.
 - The planet animation is controlled by the same spinning state as the wheel.
 - Decorative images should use empty `alt` text and avoid capturing pointer events.

@@ -6,7 +6,7 @@ A fully interactive 3D arcade-style gift wheel game built with React + React Thr
 
 ## 🚀 Quick Start (Zero Install)
 
-Open `surprise-gift.html` directly in any modern browser. No server or install needed.
+Open `index.html` directly in any modern browser. No server or install needed.
 
 ---
 
@@ -72,7 +72,7 @@ surprise-gift/
 │   │   └── UILayer.jsx         # HUD, buttons, stats
 │   ├── App.jsx
 │   └── index.js
-├── surprise-gift.html          # Single-file standalone version
+├── index.html                  # Single-file standalone version
 ├── package.json
 └── README.md
 ```
